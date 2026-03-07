@@ -11,29 +11,19 @@
 --      * Forwards the 50 MHz board clock to the core unchanged.
 --      * Maps the 3-bit VGA output of the core to 8-bit-per-channel
 --        RGB suitable for MiSTer's video_mixer.
---      * Stubs the Spartan-3-specific hardware (SRAM, platform flash,
---        MAX7219/7318/6951 panel drivers, and expansion-port panel
---        switches) that has no direct DE10-Nano equivalent.
+--      * Connects the ibm2030 SRAM interface to the DE10-Nano SDRAM
+--        via sdram_adapter (see mister/sdram_adapter.vhd).
 --      * Exposes serial I/O through the USER_IO header.
 --
 --    ---------------------------------------------------------------
 --    IMPORTANT NOTES FOR FUTURE WORK
 --    ---------------------------------------------------------------
---    Storage / SDRAM
---      The ibm2030 core uses an external SRAM interface to hold the
---      CPU's 64 KB main storage and 8 KB local storage.  On the
---      DE10-Nano this should be mapped to the on-board 32 MB SDRAM
---      via the MiSTer sdram.sv module (sys/sdram.sv).  Until that
---      adapter is written the SRAM signals below are left
---      unconnected / tied off; the core will not run correctly
---      without real storage.
---
 --    Microcode / PROM loading
 --      The original design loads an OS image from a Xilinx platform
 --      flash after FPGA configuration.  On MiSTer the image should
 --      be supplied via the HPS (Linux) side, e.g. as a .ROM file
 --      selected from the OSD.  The din / reset_prom / rclk PROM
---      interface is currently tied off.
+--      interface is currently tied off (din='1').
 --
 --    Panel switches
 --      The IBM 2030 front-panel switches are scanned via a set of
@@ -143,11 +133,38 @@ end emu;
 architecture rtl of emu is
 
     -- ---------------------------------------------------------------
+    -- sdram_adapter component
+    -- ---------------------------------------------------------------
+    component sdram_adapter
+        port (
+            clk        : in    std_logic;
+            reset      : in    std_logic;
+            sram_addr  : in    std_logic_vector(17 downto 0);
+            sram_data  : inout std_logic_vector(8 downto 0);
+            sram_ce_n  : in    std_logic;
+            sram_we_n  : in    std_logic;
+            sram_oe_n  : in    std_logic;
+            sram_ub_n  : in    std_logic;
+            sram_lb_n  : in    std_logic;
+            SDRAM_CLK  : out   std_logic;
+            SDRAM_CKE  : out   std_logic;
+            SDRAM_A    : out   std_logic_vector(12 downto 0);
+            SDRAM_BA   : out   std_logic_vector(1 downto 0);
+            SDRAM_DQ   : inout std_logic_vector(15 downto 0);
+            SDRAM_DQML : out   std_logic;
+            SDRAM_DQMH : out   std_logic;
+            SDRAM_nCS  : out   std_logic;
+            SDRAM_nCAS : out   std_logic;
+            SDRAM_nRAS : out   std_logic;
+            SDRAM_nWE  : out   std_logic
+        );
+    end component;
+
+    -- ---------------------------------------------------------------
     -- IBM2030 component (existing top-level entity)
     -- ---------------------------------------------------------------
     component ibm2030
         port (
-            -- Seven-segment displays
             ssd    : out std_logic_vector(7 downto 0);
             ssdan  : out std_logic_vector(3 downto 0);
             -- Discrete LEDs
@@ -213,11 +230,14 @@ architecture rtl of emu is
     -- Tie-off signals for unused expansion ports
     signal max7318_sda_int : std_logic;
 
-    -- SRAM tie-offs (storage not yet connected to SDRAM)
-    signal sram_addr_nc : std_logic_vector(17 downto 0);
-    signal sram_data_nc : std_logic_vector(8 downto 0);
-    signal sram_ce_nc, sram_we_nc, sram_oe_nc : std_logic;
-    signal sram_ub_nc, sram_lb_nc             : std_logic;
+    -- SRAM bus wires between ibm2030 and sdram_adapter
+    signal sram_addr_bus  : std_logic_vector(17 downto 0);
+    signal sram_data_bus  : std_logic_vector(8 downto 0);
+    signal sram_ce_bus    : std_logic;
+    signal sram_we_bus    : std_logic;
+    signal sram_oe_bus    : std_logic;
+    signal sram_ub_bus    : std_logic;
+    signal sram_lb_bus    : std_logic;
 
     -- PROM tie-offs
     signal prom_reset_nc, prom_rclk_nc : std_logic;
@@ -226,7 +246,6 @@ architecture rtl of emu is
     signal ssd_nc  : std_logic_vector(7 downto 0);
     signal ssdan_nc: std_logic_vector(3 downto 0);
     signal led_nc  : std_logic_vector(7 downto 0);
-    signal max_nc  : std_logic;
 
 begin
 
@@ -281,15 +300,14 @@ begin
             MAX6951_CS1 => open, MAX6951_CS2 => open,
             MAX6951_CS3 => open, MAX6951_DIN => open,
 
-            -- SRAM – not yet connected; tie data bus to '0'
-            -- TODO: replace with SDRAM adapter (see header notes)
-            sramaddr => sram_addr_nc,
-            srama    => sram_data_nc,
-            sramace  => sram_ce_nc,
-            sramwe   => sram_we_nc,
-            sramoe   => sram_oe_nc,
-            sramaub  => sram_ub_nc,
-            sramalb  => sram_lb_nc,
+            -- SRAM interface – wired to the SDRAM adapter
+            sramaddr => sram_addr_bus,
+            srama    => sram_data_bus,
+            sramace  => sram_ce_bus,
+            sramwe   => sram_we_bus,
+            sramoe   => sram_oe_bus,
+            sramaub  => sram_ub_bus,
+            sramalb  => sram_lb_bus,
 
             -- Serial I/O via USER_IO header pin 0 (TX) and pin 1 (RX)
             serialRx => core_rx,
@@ -305,27 +323,44 @@ begin
         );
 
     -- ---------------------------------------------------------------
+    -- SDRAM adapter
+    -- Bridges the IBM2030 synchronous-SRAM interface to the DE10-Nano
+    -- SDRAM via the MiSTer sys/sdram.sv controller.
+    -- The adapter uses a read-ahead prefetch so data is always in the
+    -- one-word cache before the CPU's ReadPulse is asserted.
+    -- ---------------------------------------------------------------
+    u_sdram_adapter : sdram_adapter
+        port map (
+            clk        => CLK_50M,
+            reset      => '0',         -- SDRAM init is handled by sdram.sv;
+                                        -- hold low to allow init on power-up
+            sram_addr  => sram_addr_bus,
+            sram_data  => sram_data_bus,
+            sram_ce_n  => sram_ce_bus,
+            sram_we_n  => sram_we_bus,
+            sram_oe_n  => sram_oe_bus,
+            sram_ub_n  => sram_ub_bus,
+            sram_lb_n  => sram_lb_bus,
+            SDRAM_CLK  => SDRAM_CLK,
+            SDRAM_CKE  => SDRAM_CKE,
+            SDRAM_A    => SDRAM_A,
+            SDRAM_BA   => SDRAM_BA,
+            SDRAM_DQ   => SDRAM_DQ,
+            SDRAM_DQML => SDRAM_DQML,
+            SDRAM_DQMH => SDRAM_DQMH,
+            SDRAM_nCS  => SDRAM_nCS,
+            SDRAM_nCAS => SDRAM_nCAS,
+            SDRAM_nRAS => SDRAM_nRAS,
+            SDRAM_nWE  => SDRAM_nWE
+        );
+
+    -- ---------------------------------------------------------------
     -- USER_IO serial passthrough
     -- USER_IO(0) = TxD output to host; USER_IO(1) = RxD input from host
     -- ---------------------------------------------------------------
     USER_IO(0) <= core_tx;
     core_rx    <= USER_IO(1);
     USER_IO(6 downto 2) <= (others => 'Z');
-
-    -- ---------------------------------------------------------------
-    -- SDRAM: safe defaults (not actively used yet)
-    -- ---------------------------------------------------------------
-    SDRAM_CLK  <= '0';
-    SDRAM_CKE  <= '0';
-    SDRAM_A    <= (others => '0');
-    SDRAM_BA   <= (others => '0');
-    SDRAM_DQ   <= (others => 'Z');
-    SDRAM_DQML <= '1';
-    SDRAM_DQMH <= '1';
-    SDRAM_nCS  <= '1';
-    SDRAM_nCAS <= '1';
-    SDRAM_nRAS <= '1';
-    SDRAM_nWE  <= '1';
 
     -- ---------------------------------------------------------------
     -- Video
