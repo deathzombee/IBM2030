@@ -37,8 +37,8 @@
 --		Add registers to all clock outputs and delay rising edge of Px and Tx clocks
 ---------------------------------------------------------------------------
 library IEEE;
-Library UNISIM;
-use UNISIM.vcomponents.all;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
+-- Xilinx FDCE primitives replaced with behavioral process statements.
 use IEEE.STD_LOGIC_1164.ALL;
 -- use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
@@ -155,15 +155,10 @@ process (OSC2, MACH_RST_3, CLOCK_START)
 end process;
 
 OSC_T_LINEA <= OSC; -- AC1B6
-OSC_T_LINED : FDCE port map(D=>OSC_T_LINEA,Q=>OSC_T_LINE,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-M_CONV_OSCD : FDCE port map(D=>N_OSC,Q=>M_CONV_OSC,CE=>'1',C=>CLOCK_IN,CLR=>'0'); -- AC1C6
-M_DLYD_OSC <= not OSC; -- AC1C6
+-- FDCE instances replaced with a single registered process for
+-- MiSTer/Altera portability (all had CE='1', CLR='0').
 DLYN_OSC <= OSC; -- AC1C6
 
--- P1 <= CLK(1);
--- P2 <= CLK(2);
--- P3 <= CLK(3);
--- P4 <= CLK(4);
 -- Delay the rising edge of each P pulse to ensure that the T pulses never overlap
 P1DLY: entity DelayRisingEdgeX port map (D=>CLK(1),CLK=>CLOCK_IN,Q=>P1D);
 P2DLY: entity DelayRisingEdgeX port map (D=>CLK(2),CLK=>CLOCK_IN,Q=>P2D);
@@ -175,22 +170,30 @@ T2A <= P1D and P2D;
 T3A <= P2D and P3D;
 T4A <= P3D and P4D;
 
-T1D : FDCE port map(D=>T1A,Q=>T1,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-T2D : FDCE port map(D=>T2A,Q=>T2,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-T3D : FDCE port map(D=>T3A,Q=>T3,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-T4D : FDCE port map(D=>T4A,Q=>T4,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-P1C : FDCE port map(D=>P1D,Q=>P1,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-P2C : FDCE port map(D=>P2D,Q=>P2,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-P3C : FDCE port map(D=>P3D,Q=>P3,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-P4C : FDCE port map(D=>P4D,Q=>P4,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-
-CLOCK_ONA <= CLK(1) or CLK(2) or CLK(3);
-CLOCK_OND : FDCE port map(D=>CLOCK_ONA,Q=>CLOCK_ON,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-CLOCK_OFFA <= not CLOCK_ONA;
-CLOCK_OFFD : FDCE port map(D=>CLOCK_OFFA,Q=>CLOCK_OFF,CE=>'1',C=>CLOCK_IN,CLR=>'0');
-P_CONV_OSCA <= OSC and CLOCK_OFFA;
-P_CONV_OSCD : FDCE port map(D=>P_CONV_OSCA,Q=>P_CONV_OSC,CE=>'1',C=>CLOCK_IN,CLR=>'0');
+CLOCK_ONA    <= CLK(1) or CLK(2) or CLK(3);
+CLOCK_OFFA   <= not CLOCK_ONA;
+P_CONV_OSCA  <= OSC and CLOCK_OFFA;
 M_CONV_OSC_2A <= not(P_CONV_OSCA);
-M_CONV_OSC_2D : FDCE port map(D=>M_CONV_OSC_2A,Q=>M_CONV_OSC_2,CE=>'1',C=>CLOCK_IN,CLR=>'0');
+
+process(CLOCK_IN)
+begin
+	if rising_edge(CLOCK_IN) then
+		OSC_T_LINE   <= OSC_T_LINEA;
+		M_CONV_OSC   <= N_OSC;       -- AC1C6
+		T1           <= T1A;
+		T2           <= T2A;
+		T3           <= T3A;
+		T4           <= T4A;
+		P1           <= P1D;
+		P2           <= P2D;
+		P3           <= P3D;
+		P4           <= P4D;
+		CLOCK_ON     <= CLOCK_ONA;
+		CLOCK_OFF    <= CLOCK_OFFA;
+		P_CONV_OSC   <= P_CONV_OSCA;
+		M_CONV_OSC_2 <= M_CONV_OSC_2A;
+	end if;
+end process;
+M_DLYD_OSC <= not OSC; -- AC1C6
 
 end FMD;

@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------
 -- vga_controller_640_60.vhd
 ------------------------------------------------------------------------
--- Author : Ulrich Zoltán
+-- Author : Ulrich Zoltï¿½n
 --          Copyright 2006 Digilent, Inc.
 ------------------------------------------------------------------------
 -- Software version : Xilinx ISE 7.1.04i
@@ -65,10 +65,7 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
-
--- simulation library
-library UNISIM;
-use UNISIM.VComponents.all;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
 
 -- the vga_controller_640_60 entity declaration
 -- read above for behavioral description and port definitions.

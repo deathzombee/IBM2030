@@ -426,11 +426,13 @@ USE ieee.std_logic_1164.all;
 entity XilinxIOVector is port( I : in STD_LOGIC_VECTOR(0 to 8); T : in STD_LOGIC; O : out STD_LOGIC_VECTOR(0 to 8); IO : inout STD_LOGIC_VECTOR(0 to 8)); end;
 
 architecture slt of XilinxIOVector is
-component IOBUF port (I, T: in std_logic; O: out std_logic; IO: inout std_logic); end component;
+-- IOBUF replaced with standard VHDL tristate for MiSTer/Altera portability.
+-- Xilinx IOBUF: IO <= I when T='0' else 'Z'; O <= IO;
 begin
 word_generator: for b in 0 to 8 generate
 	begin
-		U1: IOBUF port map (I => I(b), T => T, O => O(b), IO => IO(b));
+		IO(b) <= I(b) when T = '0' else 'Z';
+		O(b)  <= IO(b);
 	end generate;
 end slt;
 

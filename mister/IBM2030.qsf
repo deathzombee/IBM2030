@@ -1,0 +1,166 @@
+# Quartus Project Settings for IBM2030 MiSTer Core
+# Target: DE10-Nano (Intel Cyclone V 5CSEBA6U23I7)
+#
+# To build:
+#   1. Clone MiSTer framework:
+#        git clone https://github.com/MiSTer-devel/Main_MiSTer sys
+#      or download the sys/ directory from any recent MiSTer core
+#      release and place it next to this .qsf.
+#   2. Open Quartus Prime (Lite or Standard, v18.1 or later).
+#   3. File -> Open Project -> select this .qsf.
+#   4. Processing -> Start Compilation.
+#   5. Copy output/IBM2030_MiSTer.rbf to the MiSTer SD card:
+#        /media/fat/games/IBM2030/IBM2030_MiSTer.rbf
+#
+# See mister/README.md for full build and deployment instructions.
+
+set_global_assignment -name FAMILY "Cyclone V"
+set_global_assignment -name DEVICE 5CSEBA6U23I7
+set_global_assignment -name TOP_LEVEL_ENTITY sys_top
+set_global_assignment -name ORIGINAL_QUARTUS_VERSION 18.1
+set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output
+set_global_assignment -name MIN_CORE_JUNCTION_TEMP "-40"
+set_global_assignment -name MAX_CORE_JUNCTION_TEMP 100
+set_global_assignment -name POWER_PRESET_COOLING_SOLUTION "23 MM HEAT SINK WITH 200 LFPM AIRFLOW"
+set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
+set_global_assignment -name TIMING_ANALYZER_MULTICORNER_ANALYSIS ON
+set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+
+# -----------------------------------------------------------------------
+# MiSTer framework sys/ files
+# (These must be present in the ../sys relative to this .qsf file)
+# -----------------------------------------------------------------------
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/pll.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/pll_hdmi.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/pll_audio.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/sys_top.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/hps_io.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/video_mixer.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/video_freak.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/video_cleaner.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/video_scale.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/audio_out.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/sdram.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../sys/osd.sv
+set_global_assignment -name VHDL_FILE           ../sys/altera_mf.vhd
+set_global_assignment -name QIP_FILE            ../sys/sys.qip
+
+# -----------------------------------------------------------------------
+# MiSTer top-level wrapper (this port's emu module)
+# -----------------------------------------------------------------------
+set_global_assignment -name VHDL_FILE IBM2030_MiSTer.vhd
+set_global_assignment -name VHDL_FILE sdram_adapter.vhd
+
+# -----------------------------------------------------------------------
+# IBM2030 core VHDL source files
+# (Paths are relative to the mister/ subdirectory)
+# -----------------------------------------------------------------------
+set_global_assignment -name VHDL_FILE ../Buses2030.vhd
+set_global_assignment -name VHDL_FILE ../Gates2030.vhd
+set_global_assignment -name VHDL_FILE ../PH.vhd
+set_global_assignment -name VHDL_FILE ../FLL.vhd
+set_global_assignment -name VHDL_FILE ../FLVL.vhd
+set_global_assignment -name VHDL_FILE ../ccros.vhd
+set_global_assignment -name VHDL_FILE ../clock_management.vhd
+set_global_assignment -name VHDL_FILE ../shift_compare_serial.vhd
+set_global_assignment -name VHDL_FILE ../PROM_reader_serial.vhd
+set_global_assignment -name VHDL_FILE ../vga_controller_640_60.vhd
+set_global_assignment -name VHDL_FILE ../7seg_LEDs.vhd
+set_global_assignment -name VHDL_FILE ../panel_LEDs.vhd
+set_global_assignment -name VHDL_FILE ../panel_Switches.vhd
+set_global_assignment -name VHDL_FILE ../RS232RefComp.vhd
+set_global_assignment -name VHDL_FILE ../ibm1050.vhd
+set_global_assignment -name VHDL_FILE ../ibm2030-vga.vhd
+set_global_assignment -name VHDL_FILE ../ibm2030-switches.vhd
+set_global_assignment -name VHDL_FILE ../ibm2030-storage.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-01A-B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-01C-D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-02A-B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-03A.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-03B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-03C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-03D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-04A-B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-04C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-04D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-05A.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-05B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-05C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-05D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-06A-B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-06C-D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07A1.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07A2.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07B1.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07B2.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07B_2.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-07C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08A.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08A1.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08A2.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-08D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-09C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-10A.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-10B.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-10C.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_5-10D.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_UDC1.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_UDC2.vhd
+set_global_assignment -name VHDL_FILE ../FMD2030_UDC3.vhd
+set_global_assignment -name VHDL_FILE ../ibm2030-cpu.vhd
+set_global_assignment -name VHDL_FILE ../cpu.vhd
+set_global_assignment -name VHDL_FILE ../ibm2030.vhd
+
+# -----------------------------------------------------------------------
+# Timing constraints
+# -----------------------------------------------------------------------
+set_global_assignment -name SDC_FILE IBM2030.sdc
+
+# -----------------------------------------------------------------------
+# Pin assignments for DE10-Nano
+# (Only pins used by the MiSTer sys_top wrapper are listed here;
+#  the framework adds the HDMI/SDRAM/HPS pins via sys.qip)
+# -----------------------------------------------------------------------
+
+# FPGA clock
+set_location_assignment PIN_V11 -to CLK_50M
+
+# Push buttons (KEY[1:0], active-low)
+set_location_assignment PIN_AH17 -to BUTTONS[0]
+set_location_assignment PIN_AH16 -to BUTTONS[1]
+
+# USER_IO (GPIO-1 header) – Serial I/O
+# GPIO-1 pin 1 = PIN_Y15 (TxD output)
+# GPIO-1 pin 2 = PIN_AA15 (RxD input)
+set_location_assignment PIN_Y15  -to USER_IO[0]
+set_location_assignment PIN_AA15 -to USER_IO[1]
+set_location_assignment PIN_AG26 -to USER_IO[2]
+set_location_assignment PIN_AF23 -to USER_IO[3]
+set_location_assignment PIN_AG23 -to USER_IO[4]
+set_location_assignment PIN_AF21 -to USER_IO[5]
+set_location_assignment PIN_AG21 -to USER_IO[6]
+
+# I/O standard for user header
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[0]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[1]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[2]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[3]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[4]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[5]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to USER_IO[6]
+
+# -----------------------------------------------------------------------
+# Miscellaneous
+# -----------------------------------------------------------------------
+set_global_assignment -name SMART_RECOMPILE ON
+set_global_assignment -name ENABLE_OCT_DONE OFF
+set_global_assignment -name ENABLE_CONFIGURATION_PINS OFF
+set_global_assignment -name ENABLE_BOOT_SEL_PIN OFF
+set_global_assignment -name USE_CONFIGURATION_DEVICE OFF
+set_global_assignment -name CRC_ERROR_OPEN_DRAIN OFF
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_NEAR_END_VMEAS "HALF VCCIO" -fall
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -rise
+set_global_assignment -name OUTPUT_IO_TIMING_FAR_END_VMEAS "HALF SIGNAL SWING" -fall

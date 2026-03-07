@@ -50,3 +50,25 @@ xilinxsim.*
 _ngo/
 xlnx_auto*
 
+# Quartus / MiSTer build outputs
+mister/db/
+mister/incremental_db/
+mister/output/
+mister/*.qdb
+mister/*.qws
+mister/*.rpt
+mister/*.summary
+mister/*.smsg
+mister/*.done
+mister/*.flow.rpt
+mister/*.map.rpt
+mister/*.fit.rpt
+mister/*.asm.rpt
+mister/*.tan.rpt
+mister/*.sta.rpt
+mister/*.pin
+mister/*.sof
+mister/*.pof
+mister/*.jic
+mister/*.rbf
+sys/

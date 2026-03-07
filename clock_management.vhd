@@ -58,9 +58,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-library UNISIM;
-use UNISIM.VComponents.all;
-
+-- Note: library UNISIM removed for MiSTer/Altera portability.
+-- The Xilinx SRL16-based divider has been replaced with a generic counter.
 
 --***********************
 --*	Entity declaration
@@ -84,33 +83,33 @@ architecture Behavioral of clock_management is
 
 signal cclk_int : std_logic := '1';
 signal enable_cclk : std_logic;
-signal SRL_length : std_logic_vector(3 downto 0);
-signal temp : integer := (frequency / 20) - 1;
+-- Generic counter replaces Xilinx SRL16 ring divider.
+-- Generates a one-cycle pulse every (frequency/20) clock cycles,
+-- equivalent to the original SRL16 with address (frequency/20 - 1).
+signal div_counter : integer range 0 to 15 := 0;
 
 
 begin
 
 
 --***************************************************
---*	The length of the SRL16 is based on the system
---*	clock frequency entered. This frequency is then
---*	"divided" down to approximately 10MHz.
+--*	This counter generates the enable_cclk pulse
+--*	every (frequency/20) clock cycles, dividing the
+--*	system clock down to approximately 20 MHz ticks.
+--*	This replaces the Xilinx-specific SRL16 primitive.
 --***************************************************
-SRL_length <= conv_std_logic_vector(temp, length - 1);
+enable_cclk <= '1' when div_counter = 0 else '0';
 
-Divider0: SRL16
-	generic map(
-		init => X"0001"
-		)
-	port map(
-		clk => clock,
-		d => enable_cclk,
-		a0 => SRL_length(0),
-		a1 => SRL_length(1),
-		a2 => SRL_length(2),
-		a3 => SRL_length(3),
-		q => enable_cclk
-		);
+process(clock)
+begin
+	if rising_edge(clock) then
+		if div_counter = 0 then
+			div_counter <= (frequency / 20) - 1;
+		else
+			div_counter <= div_counter - 1;
+		end if;
+	end if;
+end process;
 
 
 --***************************************************
