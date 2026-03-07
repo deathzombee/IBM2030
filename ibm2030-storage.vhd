@@ -47,6 +47,14 @@ use work.Gates_package.all;
 --use UNISIM.VComponents.all;
 
 entity storage is
+    Generic (
+        -- When true, skip PROM loading after clearing storage and go directly
+        -- to the 'finished' state.  Set to true on MiSTer where no platform
+        -- flash is present and din is tied to '1'; without this the init state
+        -- machine waits for a sync pattern that never arrives, permanently
+        -- blocking CPU storage access.
+        SKIP_PROM : boolean := false
+    );
     Port ( -- Physical storage I/O from FPGA
 				phys_address : out std_logic_vector(16 downto 0);
 				phys_data : inout std_logic_vector(8 downto 0);
@@ -240,8 +248,14 @@ begin
 							-- If we were clearing main storage, go on to clearing local storage
 							state <= initClearLocalStorage;
 						else if clear_local_data_out='1' then
-								-- If we were clearing local storage, go on to initialising storage
-								state <= resetProm;
+								-- If SKIP_PROM is set (e.g. MiSTer with no platform flash),
+								-- skip the PROM loading phase and declare storage ready now.
+								-- Otherwise proceed to reset and read the PROM.
+								if SKIP_PROM then
+									state <= finished;
+								else
+									state <= resetProm;
+								end if;
 							else
 								-- Doing initialisation, so look for a further length value
 								state <= wait_for_high_length_byte;
