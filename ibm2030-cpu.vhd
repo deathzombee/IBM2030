@@ -38,12 +38,11 @@
 --
 ---------------------------------------------------------------------------
 library IEEE;
-library UNISIM;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 USE work.Buses_package.all;
-use UNISIM.vcomponents.all;
 use work.all;
 
 entity cpu is

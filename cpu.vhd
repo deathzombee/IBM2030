@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
---    Copyright © 2010 Lawrence Wilkinson lawrence@ljw.me.uk
+--    Copyright ï¿½ 2010 Lawrence Wilkinson lawrence@ljw.me.uk
 --
 --    This file is part of LJW2030, a VHDL implementation of the IBM
 --    System/360 Model 30.
@@ -38,12 +38,11 @@
 --
 ---------------------------------------------------------------------------
 library IEEE;
-library UNISIM;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 USE work.Buses_package.all;
-use UNISIM.vcomponents.all;
 use work.all;
 
 entity cpu is

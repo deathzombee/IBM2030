@@ -35,8 +35,8 @@
 --		Initial release
 ---------------------------------------------------------------------------
 LIBRARY ieee;
-Library UNISIM;
-use UNISIM.vcomponents.all;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
+-- Xilinx FDRSE primitives replaced with behavioral process statements.
 USE ieee.std_logic_1164.all;
 USE ieee.std_logic_unsigned.all;
 
@@ -145,16 +145,38 @@ BEGIN
 	Y_RESET <= (sZ_TIME and TRIGER) or RST_ATTACH or (OSC and not CLK_START); -- AC2F7
 	Z_RESET <= (sW_TIME and nTRIG); -- AC2G3
 	
-	W_JK: FDRSE port map(C=>clk,Q=>sW_TIME,R=>W_RESET,S=>W_SET,CE=>'0',D=>'0');
+	-- FDRSE instances replaced with process-based SR flip-flops for
+	-- MiSTer/Altera portability (all had CE='0', D='0'; S has priority over R).
+	process(clk) begin
+		if rising_edge(clk) then
+			if W_SET = '1' then sW_TIME <= '1';
+			elsif W_RESET = '1' then sW_TIME <= '0'; end if;
+		end if;
+	end process;
 --	W_FL : FLL port map(W_SET,W_RESET,sW_TIME); -- AC2G2
 	W_TIME <= sW_TIME;
-	X_JK: FDRSE port map(C=>clk,Q=>sX_TIME,R=>X_RESET,S=>X_SET,CE=>'0',D=>'0');
+	process(clk) begin
+		if rising_edge(clk) then
+			if X_SET = '1' then sX_TIME <= '1';
+			elsif X_RESET = '1' then sX_TIME <= '0'; end if;
+		end if;
+	end process;
 --	X_FL : FLL port map(X_SET,X_RESET,sX_TIME); -- AC2G2
 	X_TIME <= sX_TIME;
-	Y_JK: FDRSE port map(C=>clk,Q=>sY_TIME,R=>Y_RESET,S=>Y_SET,CE=>'0',D=>'0');
+	process(clk) begin
+		if rising_edge(clk) then
+			if Y_SET = '1' then sY_TIME <= '1';
+			elsif Y_RESET = '1' then sY_TIME <= '0'; end if;
+		end if;
+	end process;
 --	Y_FL : FLL port map(Y_SET,Y_RESET,sY_TIME); -- AC2G2
 	Y_TIME <= sY_TIME;
-	Z_JK: FDRSE port map(C=>clk,Q=>sZ_TIME,R=>Z_RESET,S=>Z_SET,CE=>'0',D=>'0');
+	process(clk) begin
+		if rising_edge(clk) then
+			if Z_SET = '1' then sZ_TIME <= '1';
+			elsif Z_RESET = '1' then sZ_TIME <= '0'; end if;
+		end if;
+	end process;
 --	Z_FL : FLL port map(Z_SET,Z_RESET,sZ_TIME); -- AC2F5
 	Z_TIME <= sZ_TIME;
 

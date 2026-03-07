@@ -55,8 +55,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-library UNISIM;
-use UNISIM.VComponents.all;
+-- Note: library UNISIM removed for MiSTer/Altera portability.
+-- Xilinx FDRE, LUT2 and MUXCY primitives replaced with behavioral VHDL.
 
 
 --***********************
@@ -81,11 +81,8 @@ end shift_compare_serial;
 architecture Behavioral of shift_compare_serial is
 
 
-signal q : std_logic_vector((2**length) - 1 downto 0);
-signal r : std_logic_vector((2**length) downto 0);
 signal a : std_logic_vector((2**length) - 1 downto 0);
 signal b_swapped : std_logic_vector((2**length) - 1 downto 0);
-signal GND : std_logic;
 
 
 begin
@@ -126,68 +123,43 @@ end process;
 
 
 --***********************************************
---*	This is the first FF of the shift register.
---*	It needs to be seperated from the rest
---*	since it has a different input.
+--*	Shift register and XNOR comparator.
+--*	Replaces Xilinx FDRE / LUT2 / MUXCY primitives
+--*	with portable behavioral VHDL.
+--*
+--*	Shift register: serial data enters at a(0) and
+--*	shifts toward a(2**length - 1) each clock cycle
+--*	when enable is asserted; reset drives all to '0'.
+--*
+--*	Comparator: eq is '1' only when every bit of the
+--*	shift register matches the (byte-swapped) sync
+--*	pattern b_swapped.
 --***********************************************
-GND <= '0';
-r(0) <= '1';
 
-Data_Shifter_0_Serial: FDRE
-	port map(
-		C => clock,
-		D => din,
-		CE => enable,
-		R => reset,
-		Q => a(0)
-		);
+process(clock)
+begin
+	if rising_edge(clock) then
+		if reset = '1' then
+			a <= (others => '0');
+		elsif enable = '1' then
+			a(0) <= din;
+			for i in 1 to (2**length) - 1 loop
+				a(i) <= a(i - 1);
+			end loop;
+		end if;
+	end if;
+end process;
 
-		
---***************************************************
---*	This loop generates as many registers needed
---*	based on the length of the synchronisation
---*	word.
---***************************************************
-Shifter_Serial:
-for i in 1 to (2**length) - 1 generate
-Data_Shifter_Serial: FDRE
-	port map(
-		C => clock,
-		D => a(i - 1),
-		CE => enable,
-		R => reset,
-		Q => a(i)
-		);
-end generate;
-	
-		
---***********************************************
---*	This loop generates as many LUTs and MUXCYs
---*	as needed based on the length of the
---*	synchronisation word.
---***********************************************
-Comparator_Serial:		
-for i in 0 to (2**length) - 1 generate
-Comparator_LUTs_Serial: LUT2
-	generic map(
-		INIT => X"9"
-		)
-	port map(
-		I0 => a(i),
-		I1 => b_swapped(i),
-		O => q(i)
-		);
-		
-Comparator_MUXs_Serial: MUXCY
-	port map(
-		DI => GND,
-		CI => r(i),
-		S => q(i),
-		O => r(i + 1)
-		);
-end generate;
-
-eq <= r(2**length);
-
+process(a, b_swapped)
+	variable match : std_logic;
+begin
+	match := '1';
+	for i in 0 to (2**length) - 1 loop
+		if a(i) /= b_swapped(i) then
+			match := '0';
+		end if;
+	end loop;
+	eq <= match;
+end process;
 
 end Behavioral;
