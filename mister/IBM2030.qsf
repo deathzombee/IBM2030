@@ -50,6 +50,7 @@ set_global_assignment -name QIP_FILE            ../sys/sys.qip
 # -----------------------------------------------------------------------
 set_global_assignment -name VHDL_FILE IBM2030_MiSTer.vhd
 set_global_assignment -name VHDL_FILE sdram_adapter.vhd
+set_global_assignment -name VHDL_FILE bram_storage.vhd
 
 # -----------------------------------------------------------------------
 # IBM2030 core VHDL source files
