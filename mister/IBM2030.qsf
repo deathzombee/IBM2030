@@ -49,6 +49,7 @@ set_global_assignment -name QIP_FILE            ../sys/sys.qip
 # MiSTer top-level wrapper (this port's emu module)
 # -----------------------------------------------------------------------
 set_global_assignment -name VHDL_FILE IBM2030_MiSTer.vhd
+set_global_assignment -name VHDL_FILE bram_storage.vhd
 set_global_assignment -name VHDL_FILE sdram_adapter.vhd
 
 # -----------------------------------------------------------------------

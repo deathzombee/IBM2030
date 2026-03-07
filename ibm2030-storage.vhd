@@ -47,6 +47,13 @@ use work.Gates_package.all;
 --use UNISIM.VComponents.all;
 
 entity storage is
+    generic (
+        -- When true the initialisation FSM skips PROM loading after clearing
+        -- both storage banks and jumps directly to 'finished'.  Set this when
+        -- there is no serial configuration PROM attached (e.g. MiSTer BRAM
+        -- build) so the FSM does not hang waiting for the sync pattern.
+        SKIP_PROM : boolean := false
+    );
     Port ( -- Physical storage I/O from FPGA
 				phys_address : out std_logic_vector(16 downto 0);
 				phys_data : inout std_logic_vector(8 downto 0);
@@ -241,7 +248,12 @@ begin
 							state <= initClearLocalStorage;
 						else if clear_local_data_out='1' then
 								-- If we were clearing local storage, go on to initialising storage
-								state <= resetProm;
+								-- from PROM – or skip that phase when SKIP_PROM is set.
+								if SKIP_PROM then
+									state <= finished;
+								else
+									state <= resetProm;
+								end if;
 							else
 								-- Doing initialisation, so look for a further length value
 								state <= wait_for_high_length_byte;
