@@ -48,6 +48,12 @@ USE work.Buses_package.all;
 use work.all;
 
 entity ibm2030 is
+    generic (
+        -- Forward to the storage entity: when true the init FSM skips PROM
+        -- loading so the CPU is not blocked waiting for a PROM that is absent
+        -- (e.g. on MiSTer with on-chip BRAM storage).
+        SKIP_PROM : boolean := false
+    );
     Port ( -- Physical I/O on Digilent S3 Board
 				-- Seven-segment displays
 	        ssd : out std_logic_vector(7 downto 0); -- 7-segment segment cathodes - active=0, a=bit0, g=bit6, dp=bit7
@@ -547,7 +553,9 @@ begin
 		Timer => N60_CY_TIMER_PULSE -- Output from Switches is actually 50Hz
 		);
 
-      core_storage : entity storage port map(
+      core_storage : entity storage
+      			generic map (SKIP_PROM => SKIP_PROM)
+      			port map(
 				phys_address => sramaddr(16 downto 0),
 				phys_data => srama(8 downto 0),
 				phys_CE => sramace,

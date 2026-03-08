@@ -11,9 +11,30 @@
 --      * Forwards the 50 MHz board clock to the core unchanged.
 --      * Maps the 3-bit VGA output of the core to 8-bit-per-channel
 --        RGB suitable for MiSTer's video_mixer.
---      * Connects the ibm2030 SRAM interface to the DE10-Nano SDRAM
---        via sdram_adapter (see mister/sdram_adapter.vhd).
+--      * Connects the ibm2030 SRAM interface to either:
+--          – On-chip BRAM (bram_storage.vhd) when USE_BRAM=true  [DEFAULT]
+--          – The DE10-Nano SDRAM via sdram_adapter when USE_BRAM=false
 --      * Exposes serial I/O through the USER_IO header.
+--
+--    Storage back-end selection
+--    ---------------------------
+--    Set the constant USE_BRAM in the architecture body below.
+--
+--    USE_BRAM = true  (default)
+--      On-chip Cyclone V M10K blocks are used for all 128 KB of IBM2030
+--      storage (64 KB main + 64 KB local/bump).  This gives fully
+--      deterministic single-cycle read/write timing and requires no SDRAM
+--      controller or prefetch state machine.  SKIP_PROM is automatically
+--      enabled so the init FSM does not hang waiting for a PROM that is
+--      absent on MiSTer.  All DE10-Nano SDRAM pins are driven to a safe
+--      deasserted state.
+--
+--    USE_BRAM = false
+--      The DE10-Nano 32 MB SDRAM is used via sdram_adapter.vhd.  This is
+--      the right choice only if the design needs to scale beyond on-chip
+--      BRAM capacity (e.g. disk/tape images resident in memory).  Note
+--      that SKIP_PROM is still passed as false in this mode; microcode
+--      loading from a real PROM is not yet implemented on MiSTer.
 --
 --    ---------------------------------------------------------------
 --    IMPORTANT NOTES FOR FUTURE WORK
@@ -133,81 +154,11 @@ end emu;
 architecture rtl of emu is
 
     -- ---------------------------------------------------------------
-    -- sdram_adapter component
+    -- Storage back-end selection
+    --   true  → on-chip BRAM (bram_storage.vhd)   [DEFAULT]
+    --   false → DE10-Nano SDRAM (sdram_adapter.vhd)
     -- ---------------------------------------------------------------
-    component sdram_adapter
-        port (
-            clk        : in    std_logic;
-            reset      : in    std_logic;
-            sram_addr  : in    std_logic_vector(17 downto 0);
-            sram_data  : inout std_logic_vector(8 downto 0);
-            sram_ce_n  : in    std_logic;
-            sram_we_n  : in    std_logic;
-            sram_oe_n  : in    std_logic;
-            sram_ub_n  : in    std_logic;
-            sram_lb_n  : in    std_logic;
-            SDRAM_CLK  : out   std_logic;
-            SDRAM_CKE  : out   std_logic;
-            SDRAM_A    : out   std_logic_vector(12 downto 0);
-            SDRAM_BA   : out   std_logic_vector(1 downto 0);
-            SDRAM_DQ   : inout std_logic_vector(15 downto 0);
-            SDRAM_DQML : out   std_logic;
-            SDRAM_DQMH : out   std_logic;
-            SDRAM_nCS  : out   std_logic;
-            SDRAM_nCAS : out   std_logic;
-            SDRAM_nRAS : out   std_logic;
-            SDRAM_nWE  : out   std_logic
-        );
-    end component;
-
-    -- ---------------------------------------------------------------
-    -- IBM2030 component (existing top-level entity)
-    -- ---------------------------------------------------------------
-    component ibm2030
-        port (
-            ssd    : out std_logic_vector(7 downto 0);
-            ssdan  : out std_logic_vector(3 downto 0);
-            -- Discrete LEDs
-            led    : out std_logic_vector(7 downto 0);
-            -- Pushbuttons and switches
-            pb     : in  std_logic_vector(3 downto 0);
-            sw     : in  std_logic_vector(7 downto 0);
-            -- Front panel switch scan (expansion port)
-            pa_io1, pa_io2, pa_io3, pa_io4 : in  std_logic;
-            pa_io5, pa_io6, pa_io7, pa_io8, pa_io9,
-            pa_io10, pa_io11, pa_io12, pa_io13, pa_io14 : out std_logic;
-            pa_io15, pa_io16, pa_io17, pa_io18,
-            ma2_db0, ma2_db1, ma2_db2, ma2_db3,
-            ma2_db4, ma2_db5 : in std_logic;
-            -- VGA
-            vga_r, vga_g, vga_b, vga_hs, vga_vs : out std_logic;
-            -- MAX7318 I2C (panel switches)
-            MAX7318_SCL : out std_logic;
-            MAX7318_SDA : inout std_logic;
-            -- MAX7219 SPI (panel LEDs)
-            MAX7219_CLK, MAX7219_LOAD, MAX7219_DIN : out std_logic;
-            -- MAX6951 (miniature panel LEDs)
-            MAX6951_CLK, MAX6951_CS0, MAX6951_CS1,
-            MAX6951_CS2, MAX6951_CS3, MAX6951_DIN : out std_logic;
-            -- Static RAM
-            sramaddr : out std_logic_vector(17 downto 0);
-            srama    : inout std_logic_vector(8 downto 0);
-            sramace  : out std_logic;
-            sramwe   : out std_logic;
-            sramoe   : out std_logic;
-            sramaub  : out std_logic;
-            sramalb  : out std_logic;
-            -- Serial I/O (RS-232 logic levels)
-            serialRx : in  std_logic;
-            serialTx : out std_logic;
-            -- 50 MHz clock
-            clk      : in  std_logic;
-            -- Configuration PROM interface
-            din         : in  std_logic;
-            reset_prom  : out std_logic;
-            rclk        : out std_logic
-        );
-    end component;
+    constant USE_BRAM : boolean := true;
 
     -- ---------------------------------------------------------------
     -- Internal signals
@@ -230,7 +181,8 @@ architecture rtl of emu is
     -- Tie-off signals for unused expansion ports
     signal max7318_sda_int : std_logic;
 
-    -- SRAM bus wires between ibm2030 and sdram_adapter
+    -- SRAM bus wires between ibm2030 core and the storage back-end
+    -- (bram_storage when USE_BRAM=true, sdram_adapter when USE_BRAM=false)
     signal sram_addr_bus  : std_logic_vector(17 downto 0);
     signal sram_data_bus  : std_logic_vector(8 downto 0);
     signal sram_ce_bus    : std_logic;
@@ -251,8 +203,15 @@ begin
 
     -- ---------------------------------------------------------------
     -- Instantiate the IBM2030 core
+    --
+    -- SKIP_PROM is tied to USE_BRAM: when using on-chip BRAM there is
+    -- no serial configuration PROM, so the storage init FSM must skip
+    -- the PROM-loading phase to avoid hanging at the sync-pattern wait.
     -- ---------------------------------------------------------------
-    core : ibm2030
+    core : entity work.ibm2030
+        generic map (
+            SKIP_PROM => USE_BRAM
+        )
         port map (
             -- 7-segment and LED outputs (not connected to DE10-Nano)
             ssd    => ssd_nc,
@@ -323,36 +282,68 @@ begin
         );
 
     -- ---------------------------------------------------------------
-    -- SDRAM adapter
-    -- Bridges the IBM2030 synchronous-SRAM interface to the DE10-Nano
-    -- SDRAM via the MiSTer sys/sdram.sv controller.
-    -- The adapter uses a read-ahead prefetch so data is always in the
-    -- one-word cache before the CPU's ReadPulse is asserted.
+    -- Storage back-end (selected by USE_BRAM constant above)
     -- ---------------------------------------------------------------
-    u_sdram_adapter : sdram_adapter
-        port map (
-            clk        => CLK_50M,
-            reset      => '0',         -- SDRAM init is handled by sdram.sv;
-                                        -- hold low to allow init on power-up
-            sram_addr  => sram_addr_bus,
-            sram_data  => sram_data_bus,
-            sram_ce_n  => sram_ce_bus,
-            sram_we_n  => sram_we_bus,
-            sram_oe_n  => sram_oe_bus,
-            sram_ub_n  => sram_ub_bus,
-            sram_lb_n  => sram_lb_bus,
-            SDRAM_CLK  => SDRAM_CLK,
-            SDRAM_CKE  => SDRAM_CKE,
-            SDRAM_A    => SDRAM_A,
-            SDRAM_BA   => SDRAM_BA,
-            SDRAM_DQ   => SDRAM_DQ,
-            SDRAM_DQML => SDRAM_DQML,
-            SDRAM_DQMH => SDRAM_DQMH,
-            SDRAM_nCS  => SDRAM_nCS,
-            SDRAM_nCAS => SDRAM_nCAS,
-            SDRAM_nRAS => SDRAM_nRAS,
-            SDRAM_nWE  => SDRAM_nWE
-        );
+
+    -- --- BRAM path (default) ----------------------------------------
+    -- On-chip Cyclone V M10K blocks: deterministic single-cycle timing,
+    -- no prefetch FSM needed.  All SDRAM outputs are driven to safe
+    -- deasserted values (chip deselected, clock and CKE low).
+    g_bram : if USE_BRAM generate
+        u_bram : entity work.bram_storage
+            port map (
+                clk       => CLK_50M,
+                sram_addr => sram_addr_bus,
+                sram_data => sram_data_bus,
+                sram_ce_n => sram_ce_bus,
+                sram_we_n => sram_we_bus,
+                sram_oe_n => sram_oe_bus
+            );
+
+        -- Hold DE10-Nano SDRAM in a safe deasserted state.
+        -- CKE=0 disables the SDRAM clock; nCS=1 deselects the chip.
+        SDRAM_CLK  <= '0';
+        SDRAM_CKE  <= '0';
+        SDRAM_A    <= (others => '0');
+        SDRAM_BA   <= "00";
+        SDRAM_DQ   <= (others => 'Z');
+        SDRAM_DQML <= '1';
+        SDRAM_DQMH <= '1';
+        SDRAM_nCS  <= '1';
+        SDRAM_nCAS <= '1';
+        SDRAM_nRAS <= '1';
+        SDRAM_nWE  <= '1';
+    end generate g_bram;
+
+    -- --- SDRAM path (optional) --------------------------------------
+    -- Bridges the IBM2030 SRAM interface to the DE10-Nano 32 MB SDRAM
+    -- via the MiSTer sys/sdram.sv controller.  Use when disk/tape images
+    -- or other large data sets need to be resident in memory.
+    g_sdram : if not USE_BRAM generate
+        u_sdram_adapter : entity work.sdram_adapter
+            port map (
+                clk        => CLK_50M,
+                reset      => '0',
+                sram_addr  => sram_addr_bus,
+                sram_data  => sram_data_bus,
+                sram_ce_n  => sram_ce_bus,
+                sram_we_n  => sram_we_bus,
+                sram_oe_n  => sram_oe_bus,
+                sram_ub_n  => sram_ub_bus,
+                sram_lb_n  => sram_lb_bus,
+                SDRAM_CLK  => SDRAM_CLK,
+                SDRAM_CKE  => SDRAM_CKE,
+                SDRAM_A    => SDRAM_A,
+                SDRAM_BA   => SDRAM_BA,
+                SDRAM_DQ   => SDRAM_DQ,
+                SDRAM_DQML => SDRAM_DQML,
+                SDRAM_DQMH => SDRAM_DQMH,
+                SDRAM_nCS  => SDRAM_nCS,
+                SDRAM_nCAS => SDRAM_nCAS,
+                SDRAM_nRAS => SDRAM_nRAS,
+                SDRAM_nWE  => SDRAM_nWE
+            );
+    end generate g_sdram;
 
     -- ---------------------------------------------------------------
     -- USER_IO serial passthrough

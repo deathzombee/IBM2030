@@ -12,7 +12,8 @@ IBM System/360 Model 30 FPGA core on the
 ```
 mister/
   IBM2030_MiSTer.vhd   MiSTer top-level "emu" wrapper
-  sdram_adapter.vhd    SRAM→SDRAM bridge (read-ahead prefetch)
+  bram_storage.vhd     On-chip BRAM storage (default, deterministic timing)
+  sdram_adapter.vhd    SRAM→SDRAM bridge (optional, for large external memory)
   IBM2030.qsf          Quartus project settings
   IBM2030.sdc          Timing constraints
   IBM2030.ini          MiSTer OSD configuration
@@ -105,45 +106,68 @@ interface (connected to the IBM 1050 console terminal emulator).
 
 ## Storage
 
-### How it works
+### Back-end selection
 
-The IBM2030 CPU uses an 18-bit addressed, 9-bit-wide (8 data + 1 parity)
-synchronous SRAM for its 64 KB main storage and 64 KB local storage
-(128 KB total, occupying an 18-bit byte-address space with bit 17
-selecting main vs. local storage).
+The storage back-end is chosen by the `USE_BRAM` constant near the top of
+`IBM2030_MiSTer.vhd`:
 
-The DE10-Nano has 32 MB of SDRAM (and optionally a 128 MB addon).  The
-`sdram_adapter.vhd` module bridges the two interfaces:
+```vhdl
+constant USE_BRAM : boolean := true;   -- on-chip BRAM (default)
+-- constant USE_BRAM : boolean := false;  -- DE10-Nano SDRAM
+```
 
-1. **Read-ahead prefetch**: whenever the CPU's address bus (MSAR
-   register) changes, the adapter immediately issues an SDRAM read and
-   buffers the result in a one-word cache.  Because the IBM 360/30 loads
-   its MSAR register many machine cycles before the actual read pulse,
-   the prefetch completes long before the data is needed.
+### On-chip BRAM (default, `USE_BRAM = true`)
 
-2. **Zero-wait-state reads**: when the CPU asserts its read strobe,
-   the adapter drives `sram_data` combinationally from the cache, making
-   the SDRAM appear as instantaneous SRAM.
+The IBM 360/30 needs 128 KB of 9-bit-wide storage (64 KB main storage +
+64 KB local/bump storage).  The DE10-Nano Cyclone V contains 5.5 Mbit of
+M10K block RAM; the IBM2030 storage uses ~1.1 Mbit (~20%), leaving the
+rest available for display buffers, future peripherals, etc.
 
-3. **Buffered writes**: single-cycle write pulses are captured and issued
-   as SDRAM write commands.  The cache is updated simultaneously
-   (write-through), so subsequent reads of the same address return the
-   freshly written data.
+`bram_storage.vhd` implements a single synchronous-read BRAM array:
 
-### Address / data mapping
+1. **Deterministic timing**: reads complete in exactly one 50 MHz clock
+   cycle — no refresh, no row-activate or CAS latency, no prefetch FSM.
+2. **Zero-wait-state operation**: the IBM 360/30 loads its MSAR (address)
+   register at least one full machine cycle (~400 ns, ≥ 20 FPGA clocks)
+   before the ReadPulse strobe, so the one-cycle BRAM latency is never
+   visible to the CPU.
+3. **Simpler**: replaces the multi-state SDRAM prefetch machine with a
+   single registered-read process.
+4. **SKIP_PROM**: because there is no serial configuration PROM on the
+   MiSTer board, `SKIP_PROM` is automatically set to `true` when
+   `USE_BRAM = true`.  This causes the `ibm2030-storage.vhd` init FSM
+   to jump straight to `finished` after zeroing both storage banks,
+   rather than hanging indefinitely waiting for a PROM sync pattern.
+5. **SDRAM deasserted**: all DE10-Nano SDRAM pins are driven to a safe
+   idle state (`CKE=0`, `nCS=1`) when BRAM is active.
 
-| IBM2030 | SDRAM |
-|---------|-------|
-| `phys_address[17:0]` | bits `[17:0]` of the 25-bit SDRAM byte address |
-| `phys_address[17]` = 1 | Main storage (upper 64 KB of mapped window) |
-| `phys_address[17]` = 0 | Local storage (lower 64 KB) |
-| `phys_data[7:0]` | `SDRAM_DQ[7:0]` (data byte) |
-| `phys_data[8]` | `SDRAM_DQ[8]` (parity bit) |
-| `SDRAM_DQ[15:9]` | Unused (written as `0`, ignored on read) |
+### SDRAM adapter (optional, `USE_BRAM = false`)
 
-Only the lowest 256 KB of the 32 MB SDRAM is used for IBM2030 storage.
-The remaining SDRAM is available for future features (e.g. disk images
-loaded via the MiSTer HPS).
+`sdram_adapter.vhd` bridges the IBM2030 SRAM interface to the DE10-Nano
+32 MB SDRAM via the MiSTer `sys/sdram.sv` controller.  This path is
+appropriate when disk or tape images need to be resident in memory
+(tens of MB) or when a future port targets an FPGA with insufficient
+on-chip BRAM.
+
+The adapter uses a **read-ahead prefetch** state machine to hide the
+multi-cycle SDRAM latency:
+
+1. Whenever the CPU address bus (MSAR register) changes the adapter
+   immediately issues an SDRAM read and buffers the result.
+2. When the CPU asserts its read strobe the cached data is placed on the
+   bus combinationally, matching zero-wait-state SRAM behaviour.
+3. Single-cycle write pulses are captured and written to SDRAM; the
+   cache is updated write-through.
+
+### Address / data mapping (common to both back-ends)
+
+| IBM2030 signal | Meaning |
+|---|---|
+| `sramaddr[17]` | Always `0` (tied off in `ibm2030.vhd`) |
+| `sramaddr[16]` | `1` = main storage (64 KB), `0` = local/bump storage (64 KB) |
+| `sramaddr[15:0]` | Byte address within the selected 64 KB bank |
+| `srama[7:0]` (`sram_data[7:0]`) | 8-bit data byte |
+| `srama[8]` (`sram_data[8]`) | Parity bit |
 
 ---
 
